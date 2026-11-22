@@ -1,0 +1,1 @@
+Fixed the :func:`pytest.approx` failure details for lists and dicts of :class:`~datetime.datetime` values, which showed "representation of details failed" instead of the comparison table. A datetime has no relative difference, so only the absolute one is shown.

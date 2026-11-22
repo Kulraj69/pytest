@@ -1723,6 +1723,38 @@ class TestApproxDatetime:
             {"x": timedelta(seconds=100)}, abs=timedelta(seconds=10)
         )
 
+    def test_datetime_in_sequence_repr_compare(self):
+        """A datetime has no relative difference, so only the absolute one is shown (#15434)."""
+        from datetime import datetime
+        from datetime import timedelta
+
+        start = datetime(2024, 1, 1)
+        explanation = approx(
+            [start, start + timedelta(minutes=1)], abs=timedelta(seconds=1)
+        )._repr_compare([start, start])
+        assert [line.rstrip() for line in explanation] == [
+            "comparison failed. Mismatched elements: 1 / 2:",
+            "Max absolute difference: 0:01:00",
+            "Index | Obtained            | Expected",
+            "1     | 2024-01-01 00:00:00 | 2024-01-01 00:01:00 ± 0:00:01",
+        ]
+
+    def test_datetime_in_mapping_repr_compare(self):
+        """A datetime has no relative difference, so only the absolute one is shown (#15434)."""
+        from datetime import datetime
+        from datetime import timedelta
+
+        start = datetime(2024, 1, 1)
+        explanation = approx(
+            {"t": start + timedelta(minutes=1)}, abs=timedelta(seconds=1)
+        )._repr_compare({"t": start})
+        assert [line.rstrip() for line in explanation] == [
+            "comparison failed. Mismatched elements: 1 / 1:",
+            "Max absolute difference: 0:01:00",
+            "Index | Obtained            | Expected",
+            "t     | 2024-01-01 00:00:00 | 2024-01-01 00:01:00 ± 0:00:01",
+        ]
+
     def test_datetime_in_sequence(self):
         from datetime import datetime
         from datetime import timedelta

@@ -47,15 +47,24 @@ def _max_diff(current: Any, candidate: Any) -> Any:
 
 
 def _vetted_diffs(
-    max_abs_diff: Any, max_rel_diff: Any, rel_diff_is_infinite: bool
-) -> tuple[Any, Any]:
+    max_abs_diff: Any,
+    max_rel_diff: Any,
+    rel_diff_is_infinite: bool,
+    only_datetimes_differ: bool = False,
+) -> tuple[Any, Any | None]:
     """Turn the accumulators into the values shown in the failure message.
 
     ``-math.inf`` means "no difference could be computed at all", which happens
     when every mismatched element is a non-number (#13012).
+
+    ``None`` as the relative difference means it does not apply, which happens
+    when every mismatched element is a datetime: a point in time has no
+    relative difference (#15434).
     """
     if rel_diff_is_infinite:
         max_rel_diff = math.inf
+    if only_datetimes_differ and max_abs_diff is not None:
+        return max_abs_diff, None
     return (
         -math.inf if max_abs_diff is None else max_abs_diff,
         -math.inf if max_rel_diff is None else max_rel_diff,
@@ -68,7 +77,7 @@ def _compare_approx(
     number_of_elements: int,
     different_ids: Sequence[object],
     max_abs_diff: float,
-    max_rel_diff: float,
+    max_rel_diff: float | None,
 ) -> list[str]:
     message_list = list(message_data)
     message_list.insert(0, ("Index", "Obtained", "Expected"))
@@ -80,8 +89,10 @@ def _compare_approx(
     explanation = [
         f"comparison failed. Mismatched elements: {len(different_ids)} / {number_of_elements}:",
         f"Max absolute difference: {max_abs_diff}",
-        f"Max relative difference: {max_rel_diff}",
-    ] + [
+    ]
+    if max_rel_diff is not None:
+        explanation.append(f"Max relative difference: {max_rel_diff}")
+    explanation += [
         f"{indexes:<{max_sizes[0]}} | {obtained:<{max_sizes[1]}} | {expected:<{max_sizes[2]}}"
         for indexes, obtained, expected in message_list
     ]
@@ -330,10 +341,13 @@ class ApproxMapping(Approx[Mapping[Any, Any]]):
         max_abs_diff: Any = None
         max_rel_diff: Any = None
         rel_diff_is_infinite = False
+        only_datetimes_differ = True
         different_ids = []
         for approx_key, approx_value in approx_side_as_map.items():
             other_value = other_side[approx_key]
             if approx_value != other_value:
+                is_datetime = isinstance(approx_value.expected, datetime)
+                only_datetimes_differ &= is_datetime
                 if approx_value.expected is not None and other_value is not None:
                     try:
                         max_abs_diff = _max_diff(
@@ -341,7 +355,9 @@ class ApproxMapping(Approx[Mapping[Any, Any]]):
                             # TODO: The type error here seems correct.
                             abs(approx_value.expected - other_value),  # type: ignore[operator]
                         )
-                        if approx_value.expected == 0:
+                        if is_datetime:
+                            pass
+                        elif approx_value.expected == 0:
                             rel_diff_is_infinite = True
                         else:
                             max_rel_diff = _max_diff(
@@ -357,7 +373,7 @@ class ApproxMapping(Approx[Mapping[Any, Any]]):
                 different_ids.append(approx_key)
 
         max_abs_diff, max_rel_diff = _vetted_diffs(
-            max_abs_diff, max_rel_diff, rel_diff_is_infinite
+            max_abs_diff, max_rel_diff, rel_diff_is_infinite, only_datetimes_differ
         )
 
         message_data = [
@@ -427,11 +443,14 @@ class ApproxSequenceLike(Approx[Sequence[Any]]):
         max_abs_diff: Any = None
         max_rel_diff: Any = None
         rel_diff_is_infinite = False
+        only_datetimes_differ = True
         different_ids = []
         for i, (approx_value, other_value) in enumerate(
             zip(approx_side_as_map, other_side, strict=True)
         ):
             if approx_value != other_value:
+                is_datetime = isinstance(approx_value.expected, datetime)
+                only_datetimes_differ &= is_datetime
                 try:
                     abs_diff = abs(approx_value.expected - other_value)
                     max_abs_diff = _max_diff(max_abs_diff, abs_diff)
@@ -443,7 +462,9 @@ class ApproxSequenceLike(Approx[Sequence[Any]]):
                 except TypeError:
                     pass
                 else:
-                    if other_value == 0:
+                    if is_datetime:
+                        pass
+                    elif other_value == 0:
                         rel_diff_is_infinite = True
                     else:
                         max_rel_diff = _max_diff(
@@ -452,7 +473,7 @@ class ApproxSequenceLike(Approx[Sequence[Any]]):
                 different_ids.append(i)
 
         max_abs_diff, max_rel_diff = _vetted_diffs(
-            max_abs_diff, max_rel_diff, rel_diff_is_infinite
+            max_abs_diff, max_rel_diff, rel_diff_is_infinite, only_datetimes_differ
         )
         message_data = [
             (str(i), str(other_side[i]), str(approx_side_as_map[i]))
