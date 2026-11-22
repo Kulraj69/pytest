@@ -11,6 +11,7 @@ import textwrap
 from typing import Any
 from typing import cast
 from typing import ClassVar
+import warnings
 
 import hypothesis
 from hypothesis import strategies
@@ -1280,6 +1281,35 @@ class TestMetafunc:
             match=r"Passing a non-Collection iterable to parametrize is deprecated",
         ):
             metafunc.parametrize("x", data_generator())
+
+    def test_parametrize_dict_warns(self) -> None:
+        """Only the keys of a dict are used as argvalues, which is rarely intended (#11632)."""
+
+        def func(x: str) -> None:
+            raise NotImplementedError()
+
+        metafunc = self.Metafunc(func)
+
+        with pytest.warns(
+            pytest.PytestCollectionWarning,
+            match=r"parametrize got a dict as argvalues, so only its keys are used",
+        ):
+            metafunc.parametrize("x", {"foo": "bar", "hello": "world"})
+        assert [c.params["x"] for c in metafunc._calls] == ["foo", "hello"]
+
+    def test_parametrize_dict_keys_does_not_warn(self) -> None:
+        def func(x: str, y: dict[str, str]) -> None:
+            raise NotImplementedError()
+
+        metafunc = self.Metafunc(func)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            metafunc.parametrize("x", {"foo": "bar"}.keys())
+            metafunc.parametrize("y", [{"foo": "bar"}])
+        assert [c.params for c in metafunc._calls] == [
+            {"x": "foo", "y": {"foo": "bar"}}
+        ]
 
 
 class TestMetafuncFunctional:

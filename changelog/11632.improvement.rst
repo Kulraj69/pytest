@@ -1,0 +1,1 @@
+:ref:`@pytest.mark.parametrize <pytest.mark.parametrize ref>` and :meth:`metafunc.parametrize <pytest.Metafunc.parametrize>` now issue a :class:`~pytest.PytestCollectionWarning` when ``argvalues`` is a :class:`dict`, since only its keys are used as parameters. Pass ``list(d)`` to parametrize over the keys, or ``[d]`` to pass the dict as a single parameter.

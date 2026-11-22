@@ -216,6 +216,16 @@ class ParameterSet(NamedTuple):
                 ),
                 stacklevel=3,
             )
+        elif isinstance(argvalues, Mapping):
+            warnings.warn(
+                PytestCollectionWarning(
+                    f"{nodeid}: parametrize got a {type(argvalues).__name__} as argvalues, "
+                    "so only its keys are used as parameters.\n"
+                    "Pass list(argvalues) to parametrize over the keys, or wrap it "
+                    "in a list to pass it as a single parameter."
+                ),
+                stacklevel=3,
+            )
 
         argnames, force_tuple = cls._parse_parametrize_args(argnames, argvalues)
         parameters = cls._parse_parametrize_parameters(argvalues, force_tuple)
